@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lærlingsplass Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f2ec;
+    --surface: #ffffff;
+    --surface2: #f0ede6;
+    --border: #e2ddd4;
+    --text: #1a1814;
+    --text2: #6b6558;
+    --text3: #a09890;
+    --accent: #2b4fff;
+    --accent-light: #eaedff;
+    --pending: #e8a838;
+    --pending-bg: #fff8ea;
+    --maybe: #7b5ea7;
+    --maybe-bg: #f4f0fa;
+    --yes: #2d8a5e;
+    --yes-bg: #eaf6f0;
+    --no: #c44536;
+    --no-bg: #fdf0ee;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.07);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.11);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* LAYOUT */
+  .app { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 300px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .main {
+    flex: 1;
+    padding: 40px;
+    overflow-y: auto;
+    max-width: 820px;
+  }
+
+  /* SIDEBAR */
+  .sidebar-header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.4rem;
+    line-height: 1.2;
+    color: var(--text);
+  }
+
+  .sidebar-header p {
+    font-size: 0.78rem;
+    color: var(--text3);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  .filter-bar {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filter-bar label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+
+  .filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .pill {
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+  }
+  .pill.all { background: var(--surface2); color: var(--text2); border-color: var(--border); }
+  .pill.all.active { background: var(--text); color: white; border-color: var(--text); }
+  .pill.pending { background: var(--pending-bg); color: var(--pending); border-color: #f0c878; }
+  .pill.pending.active { background: var(--pending); color: white; border-color: var(--pending); }
+  .pill.maybe { background: var(--maybe-bg); color: var(--maybe); border-color: #c4b0de; }
+  .pill.maybe.active { background: var(--maybe); color: white; border-color: var(--maybe); }
+  .pill.yes { background: var(--yes-bg); color: var(--yes); border-color: #9dd4bc; }
+  .pill.yes.active { background: var(--yes); color: white; border-color: var(--yes); }
+  .pill.no { background: var(--no-bg); color: var(--no); border-color: #e4a49c; }
+  .pill.no.active { background: var(--no); color: white; border-color: var(--no); }
+
+  .company-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+
+  .company-item {
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .company-item:hover { background: var(--surface2); }
+  .company-item.active { background: var(--accent-light); border-color: #c0c8ff; }
+  .company-item.dragging { opacity: 0.4; background: var(--surface2); }
+  .company-item.drag-over { border-color: var(--accent); background: var(--accent-light); }
+
+  .drag-handle {
+    color: var(--text3);
+    font-size: 0.75rem;
+    cursor: grab;
+    padding: 0 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  .company-item:hover .drag-handle { opacity: 1; }
+  .drag-handle:active { cursor: grabbing; }
+
+  .company-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-pending { background: var(--pending); }
+  .dot-maybe { background: var(--maybe); }
+  .dot-yes { background: var(--yes); }
+  .dot-no { background: var(--no); }
+
+  .company-item-info { flex: 1; min-width: 0; }
+  .company-item-name { font-size: 0.88rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .company-item-field { font-size: 0.73rem; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .add-btn {
+    margin: 16px;
+    padding: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.15s;
+  }
+  .add-btn:hover { opacity: 0.88; }
+
+  /* MAIN */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    text-align: center;
+    gap: 12px;
+    color: var(--text3);
+  }
+  .empty-state .big { font-family: 'DM Serif Display', serif; font-size: 2.2rem; color: var(--text2); }
+  .empty-state p { font-size: 0.9rem; max-width: 280px; line-height: 1.6; }
+
+  .company-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .company-title-area { flex: 1; }
+
+  .company-name-input {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    width: 100%;
+    outline: none;
+    line-height: 1.2;
+  }
+  .company-name-input::placeholder { color: var(--border); }
+
+  .company-field-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    width: 100%;
+    outline: none;
+    margin-top: 4px;
+  }
+  .company-field-input::placeholder { color: var(--text3); opacity: 0.5; }
+
+  .status-selector {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .status-btn {
+    padding: 6px 12px;
+    border-radius: 99px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+    opacity: 0.5;
+  }
+  .status-btn.pending { background: var(--pending-bg); color: var(--pending); border-color: #f0c878; }
+  .status-btn.pending.active { opacity: 1; }
+  .status-btn.maybe { background: var(--maybe-bg); color: var(--maybe); border-color: #c4b0de; }
+  .status-btn.maybe.active { opacity: 1; }
+  .status-btn.yes { background: var(--yes-bg); color: var(--yes); border-color: #9dd4bc; }
+  .status-btn.yes.active { opacity: 1; }
+  .status-btn.no { background: var(--no-bg); color: var(--no); border-color: #e4a49c; }
+  .status-btn.no.active { opacity: 1; }
+
+  .sections { display: flex; flex-direction: column; gap: 24px; }
+
+  .section {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-body { padding: 20px; }
+
+  /* Notes / general info */
+  .notes-textarea {
+    width: 100%;
+    min-height: 140px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+  }
+  .notes-textarea::placeholder { color: var(--text3); }
+
+  /* Contacts */
+  .contacts-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .contact-card {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    position: relative;
+  }
+
+  .contact-field { display: flex; flex-direction: column; gap: 3px; }
+  .contact-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+  .contact-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.87rem;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    outline: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s;
+    padding-bottom: 2px;
+  }
+  .contact-input:focus { border-bottom-color: var(--accent); }
+  .contact-input::placeholder { color: var(--text3); opacity: 0.5; }
+
+  .contact-remove {
+    position: absolute;
+    top: 10px; right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text3);
+    line-height: 1;
+    padding: 0;
+  }
+  .contact-remove:hover { color: var(--no); }
+
+  .add-small-btn {
+    background: none;
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.83rem;
+    color: var(--text3);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    transition: all 0.15s;
+    margin-top: 4px;
+  }
+  .add-small-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Timeline / log */
+  .log-list { display: flex; flex-direction: column; gap: 0; }
+
+  .log-entry {
+    display: flex;
+    gap: 14px;
+    padding-bottom: 18px;
+    position: relative;
+  }
+
+  .log-entry::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 24px;
+    bottom: 0;
+    width: 1px;
+    background: var(--border);
+  }
+  .log-entry:last-child::before { display: none; }
+
+  .log-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .log-body { flex: 1; padding-top: 5px; }
+
+  .log-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .log-date-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text3);
+    border: none;
+    background: transparent;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .log-text-input {
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.15s;
+  }
+  .log-text-input:focus { border-color: var(--accent); background: var(--surface); }
+  .log-text-input::placeholder { color: var(--text3); }
+
+  .log-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text3);
+    padding: 0;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .log-remove:hover { color: var(--no); }
+
+  /* Delete company */
+  .danger-zone {
+    margin-top: 12px;
+    padding: 16px 20px;
+    background: var(--no-bg);
+    border-radius: var(--radius);
+    border: 1px solid #f0c0ba;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .danger-zone p { font-size: 0.83rem; color: var(--no); }
+  .delete-btn {
+    background: var(--no);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .delete-btn:hover { opacity: 0.85; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+  }
+  .stat-num { font-family: 'DM Serif Display', serif; font-size: 1.2rem; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 28px;
+    width: 420px;
+    max-width: 95vw;
+    box-shadow: var(--shadow-lg);
+  }
+  .modal h2 { font-family: 'DM Serif Display', serif; font-size: 1.4rem; margin-bottom: 18px; }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .modal-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    background: var(--surface);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-primary {
+    flex: 1;
+    padding: 11px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-secondary {
+    padding: 11px 18px;
+    background: var(--surface2);
+    color: var(--text2);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-secondary:hover { background: var(--border); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  @media (max-width: 700px) {
+    .app { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: relative; }
+    .main { padding: 20px 16px; }
+    .status-selector { flex-wrap: wrap; }
+    .company-header { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>Lærlingsplass<br>Tracker</h1>
+      <p>Hold oversikt over søknadene dine</p>
+    </div>
+    <div class="filter-bar">
+      <label>Filtrer</label>
+      <div class="filter-pills">
+        <span class="pill all active" onclick="setFilter('all')">Alle</span>
+        <span class="pill pending" onclick="setFilter('pending')">Venter</span>
+        <span class="pill maybe" onclick="setFilter('maybe')">Kanskje</span>
+        <span class="pill yes" onclick="setFilter('yes')">Ja ✓</span>
+        <span class="pill no" onclick="setFilter('no')">Nei ✗</span>
+      </div>
+    </div>
+    <div class="company-list" id="companyList"></div>
+    <button class="add-btn" onclick="openModal()">
+      <span style="font-size:1.2rem;line-height:1">+</span> Legg til bedrift
+    </button>
+    <div style="display:flex;gap:8px;margin:0 16px 16px;">
+      <button class="btn-secondary" style="flex:1;padding:9px;font-size:0.8rem;border-radius:10px;" onclick="exportData()">⬇ Eksporter</button>
+      <button class="btn-secondary" style="flex:1;padding:9px;font-size:0.8rem;border-radius:10px;" onclick="document.getElementById('importInput').click()">⬆ Importer</button>
+      <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)" />
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" id="mainArea">
+    <div class="empty-state" id="emptyState">
+      <div class="big">👷</div>
+      <div class="big">Ingen bedrift valgt</div>
+      <p>Legg til en bedrift i listen til venstre for å begynne å spore søknadene dine.</p>
+    </div>
+    <div id="companyView" style="display:none"></div>
+  </main>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Ny bedrift</h2>
+    <div class="modal-field">
+      <label>Bedriftsnavn *</label>
+      <input class="modal-input" id="newName" placeholder="f.eks. Telenor AS" />
+    </div>
+    <div class="modal-field">
+      <label>Bransje / fagfelt</label>
+      <input class="modal-input" id="newField" placeholder="f.eks. IT, Elektro, Rør..." />
+    </div>
+    <div class="modal-field">
+      <label>Nettsted</label>
+      <input class="modal-input" id="newWebsite" placeholder="https://..." />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn-primary" onclick="addCompany()">Legg til</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────
+let companies = JSON.parse(localStorage.getItem('laerling_companies') || '[]');
+let activeId = null;
+let activeFilter = 'all';
+
+function save() {
+  localStorage.setItem('laerling_companies', JSON.stringify(companies));
+}
+
+function getCompany(id) {
+  return companies.find(c => c.id === id);
+}
+
+// ─── SIDEBAR ────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('companyList');
+  const filtered = companies.filter(c => activeFilter === 'all' || c.status === activeFilter);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<p style="font-size:0.8rem;color:var(--text3);padding:12px 8px;text-align:center;">Ingen bedrifter her</p>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(c => `
+    <div class="company-item ${c.id === activeId ? 'active' : ''}"
+      draggable="true"
+      data-id="${c.id}"
+      onclick="selectCompany('${c.id}')">
+      <div class="drag-handle" onmousedown="event.stopPropagation()" title="Dra for å sortere">⠿</div>
+      <div class="company-dot dot-${c.status}"></div>
+      <div class="company-item-info">
+        <div class="company-item-name">${c.name}</div>
+        <div class="company-item-field">${c.field || '—'}</div>
+      </div>
+    </div>
+  `).join('');
+
+  initDrag();
+}
+
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.pill.${f === 'all' ? 'all' : f}`).classList.add('active');
+  renderSidebar();
+}
+
+// ─── STATS ──────────────────────────────────────────────
+function renderStats() {
+  const counts = { pending: 0, maybe: 0, yes: 0, no: 0 };
+  companies.forEach(c => counts[c.status]++);
+  return `
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-num" style="color:var(--text2)">${companies.length}</span> totalt</div>
+      <div class="stat"><span class="stat-num" style="color:var(--pending)">${counts.pending}</span> venter</div>
+      <div class="stat"><span class="stat-num" style="color:var(--maybe)">${counts.maybe}</span> kanskje</div>
+      <div class="stat"><span class="stat-num" style="color:var(--yes)">${counts.yes}</span> ja</div>
+      <div class="stat"><span class="stat-num" style="color:var(--no)">${counts.no}</span> nei</div>
+    </div>
+  `;
+}
+
+// ─── COMPANY VIEW ────────────────────────────────────────
+function selectCompany(id) {
+  activeId = id;
+  renderSidebar();
+  renderCompanyView();
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('companyView').style.display = 'block';
+}
+
+function renderCompanyView() {
+  const c = getCompany(activeId);
+  if (!c) return;
+
+  const statusLabels = { pending: 'Venter', maybe: 'Kanskje', yes: 'Ja ✓', no: 'Nei ✗' };
+  const view = document.getElementById('companyView');
+
+  view.innerHTML = `
+    ${renderStats()}
+
+    <div class="company-header">
+      <div class="company-title-area">
+        <input class="company-name-input" value="${esc(c.name)}" placeholder="Bedriftsnavn"
+          oninput="updateField('name', this.value)" />
+        <input class="company-field-input" value="${esc(c.field || '')}" placeholder="Bransje / fagfelt"
+          oninput="updateField('field', this.value)" />
+        ${c.website ? `<a href="${esc(c.website)}" target="_blank" style="font-size:0.78rem;color:var(--accent);margin-top:4px;display:inline-block;">${esc(c.website)}</a>` : ''}
+      </div>
+      <div class="status-selector">
+        ${['pending','maybe','yes','no'].map(s => `
+          <button class="status-btn ${s} ${c.status === s ? 'active' : ''}" onclick="setStatus('${s}')">
+            ${statusLabels[s]}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="sections">
+
+      <!-- GENERAL INFO -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">📝 Generell info & tanker</div>
+        </div>
+        <div class="section-body">
+          <textarea class="notes-textarea" placeholder="Skriv tanker, inntrykk, hva du vet om bedriften..."
+            oninput="updateField('notes', this.value)">${esc(c.notes || '')}</textarea>
+        </div>
+      </div>
+
+      <!-- CONTACTS -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">👤 Kontaktpersoner</div>
+        </div>
+        <div class="section-body">
+          <div class="contacts-list" id="contactsList">
+            ${renderContacts(c)}
+          </div>
+          <button class="add-small-btn" onclick="addContact()">+ Legg til kontaktperson</button>
+        </div>
+      </div>
+
+      <!-- CONTACT LOG -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">📋 Kontaktlogg</div>
+        </div>
+        <div class="section-body">
+          <div class="log-list" id="logList">
+            ${renderLog(c)}
+          </div>
+          <button class="add-small-btn" onclick="addLogEntry()">+ Legg til hendelse</button>
+        </div>
+      </div>
+
+      <!-- DANGER -->
+      <div class="danger-zone">
+        <p>Fjern denne bedriften fra listen</p>
+        <button class="delete-btn" onclick="deleteCompany()">Slett bedrift</button>
+      </div>
+
+    </div>
+  `;
+}
+
+function renderContacts(c) {
+  return (c.contacts || []).map((p, i) => `
+    <div class="contact-card" id="contact-${i}">
+      <button class="contact-remove" onclick="removeContact(${i})">✕</button>
+      <div class="contact-field" style="grid-column:1/-1">
+        <div class="contact-label">Navn</div>
+        <input class="contact-input" value="${esc(p.name||'')}" placeholder="Fullt navn"
+          oninput="updateContact(${i},'name',this.value)" />
+      </div>
+      <div class="contact-field">
+        <div class="contact-label">Stilling / rolle</div>
+        <input class="contact-input" value="${esc(p.role||'')}" placeholder="f.eks. HR, faglig leder"
+          oninput="updateContact(${i},'role',this.value)" />
+      </div>
+      <div class="contact-field">
+        <div class="contact-label">Telefon</div>
+        <input class="contact-input" value="${esc(p.phone||'')}" placeholder="999 00 000"
+          oninput="updateContact(${i},'phone',this.value)" />
+      </div>
+      <div class="contact-field" style="grid-column:1/-1">
+        <div class="contact-label">E-post</div>
+        <input class="contact-input" value="${esc(p.email||'')}" placeholder="navn@bedrift.no"
+          oninput="updateContact(${i},'email',this.value)" />
+      </div>
+      <div class="contact-field" style="grid-column:1/-1">
+        <div class="contact-label">Notat</div>
+        <input class="contact-input" value="${esc(p.note||'')}" placeholder="Annen info..."
+          oninput="updateContact(${i},'note',this.value)" />
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderLog(c) {
+  const emojis = ['💬','📞','📧','🤝','📮','🗓️'];
+  return (c.log || []).map((entry, i) => `
+    <div class="log-entry">
+      <div class="log-dot">${emojis[i % emojis.length]}</div>
+      <div class="log-body">
+        <div class="log-meta">
+          <input type="date" class="log-date-input" value="${entry.date || ''}"
+            onchange="updateLog(${i},'date',this.value)" />
+          <button class="log-remove" onclick="removeLog(${i})">✕</button>
+        </div>
+        <textarea class="log-text-input" placeholder="Hva skjedde? Hvem snakket du med? Hva ble sagt?"
+          oninput="updateLog(${i},'text',this.value)">${esc(entry.text||'')}</textarea>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── MUTATIONS ───────────────────────────────────────────
+function updateField(field, val) {
+  const c = getCompany(activeId);
+  c[field] = val;
+  save();
+  if (field === 'name' || field === 'field') renderSidebar();
+}
+
+function setStatus(s) {
+  const c = getCompany(activeId);
+  c.status = s;
+  save();
+  renderSidebar();
+  // just update status buttons and stats without full re-render
+  document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.status-btn.${s}`).classList.add('active');
+  document.querySelector('.stats-bar').outerHTML; // will be updated on next render
+  renderCompanyView(); // re-render for stats
+}
+
+function addContact() {
+  const c = getCompany(activeId);
+  if (!c.contacts) c.contacts = [];
+  c.contacts.push({ name:'', role:'', phone:'', email:'', note:'' });
+  save();
+  document.getElementById('contactsList').innerHTML = renderContacts(c);
+}
+
+function updateContact(i, field, val) {
+  const c = getCompany(activeId);
+  c.contacts[i][field] = val;
+  save();
+}
+
+function removeContact(i) {
+  const c = getCompany(activeId);
+  c.contacts.splice(i, 1);
+  save();
+  document.getElementById('contactsList').innerHTML = renderContacts(c);
+}
+
+function addLogEntry() {
+  const c = getCompany(activeId);
+  if (!c.log) c.log = [];
+  const today = new Date().toISOString().split('T')[0];
+  c.log.unshift({ date: today, text: '' });
+  save();
+  document.getElementById('logList').innerHTML = renderLog(c);
+}
+
+function updateLog(i, field, val) {
+  const c = getCompany(activeId);
+  c.log[i][field] = val;
+  save();
+}
+
+function removeLog(i) {
+  const c = getCompany(activeId);
+  c.log.splice(i, 1);
+  save();
+  document.getElementById('logList').innerHTML = renderLog(c);
+}
+
+function deleteCompany() {
+  if (!confirm(`Slett "${getCompany(activeId).name}"? Dette kan ikke angres.`)) return;
+  companies = companies.filter(c => c.id !== activeId);
+  activeId = null;
+  save();
+  renderSidebar();
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('companyView').style.display = 'none';
+}
+
+// ─── MODAL ───────────────────────────────────────────────
+function openModal() {
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('newName').focus();
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.getElementById('newName').value = '';
+  document.getElementById('newField').value = '';
+  document.getElementById('newWebsite').value = '';
+}
+
+function addCompany() {
+  const name = document.getElementById('newName').value.trim();
+  if (!name) { document.getElementById('newName').focus(); return; }
+  const company = {
+    id: 'c' + Date.now(),
+    name,
+    field: document.getElementById('newField').value.trim(),
+    website: document.getElementById('newWebsite').value.trim(),
+    status: 'pending',
+    notes: '',
+    contacts: [],
+    log: []
+  };
+  companies.unshift(company);
+  save();
+  closeModal();
+  renderSidebar();
+  selectCompany(company.id);
+}
+
+// enter key on modal
+document.getElementById('newWebsite').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addCompany();
+});
+
+// close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+// ─── UTILS ───────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── DRAG & DROP ─────────────────────────────────────────
+let dragSrcId = null;
+
+function initDrag() {
+  const items = document.querySelectorAll('.company-item[draggable]');
+  items.forEach(item => {
+    item.addEventListener('dragstart', e => {
+      dragSrcId = item.dataset.id;
+      setTimeout(() => item.classList.add('dragging'), 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      document.querySelectorAll('.company-item').forEach(i => i.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.company-item').forEach(i => i.classList.remove('drag-over'));
+      if (item.dataset.id !== dragSrcId) item.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave', () => {
+      item.classList.remove('drag-over');
+    });
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove('drag-over');
+      const targetId = item.dataset.id;
+      if (!dragSrcId || dragSrcId === targetId) return;
+
+      // Reorder in the full companies array
+      const srcIdx = companies.findIndex(c => c.id === dragSrcId);
+      const tgtIdx = companies.findIndex(c => c.id === targetId);
+      const [moved] = companies.splice(srcIdx, 1);
+      companies.splice(tgtIdx, 0, moved);
+      save();
+      renderSidebar();
+    });
+  });
+}
+
+// ─── EXPORT / IMPORT ─────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(companies, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `laerlingsplass-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error();
+      if (!confirm(`Importer ${data.length} bedrifter? Dette vil overskrive eksisterende data.`)) return;
+      companies = data;
+      save();
+      activeId = null;
+      renderSidebar();
+      document.getElementById('emptyState').style.display = 'flex';
+      document.getElementById('companyView').style.display = 'none';
+      alert('Import vellykket!');
+    } catch {
+      alert('Ugyldig fil. Sørg for at det er en gyldig backup-fil.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ─── INIT ────────────────────────────────────────────────
+renderSidebar();
+if (companies.length > 0) {
+  selectCompany(companies[0].id);
+}
+</script>
+</body>
+</html>
